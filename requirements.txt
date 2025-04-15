@@ -1,0 +1,6 @@
+pyrogram
+tgcrypto
+gspread
+oauth2client
+apscheduler
+python-dotenv

@@ -199,6 +199,91 @@ def list_ad_group_ads(
     return result
 
 
+def upload_html5_banner(
+    client: GoogleAdsClient,
+    customer_id: str,
+    file_path: str,
+    ad_id: str,
+    name: str = None,
+) -> dict:
+    """
+    Загрузить HTML5 ZIP-баннер и добавить к существующему App Ad.
+    file_path — путь к ZIP-файлу на локальной машине.
+    ad_id — получи через list_ad_group_ads.
+    """
+    with open(file_path, "rb") as f:
+        data = f.read()
+
+    # 1. Загружаем ZIP как MediaBundleAsset
+    asset_service = client.get_service("AssetService")
+    asset_op = client.get_type("AssetOperation")
+    asset = asset_op.create
+    if name:
+        asset.name = name
+    else:
+        import os
+        asset.name = os.path.basename(file_path)
+    asset.media_bundle_asset.data = data
+
+    asset_response = asset_service.mutate_assets(
+        customer_id=customer_id, operations=[asset_op]
+    )
+    asset_resource_name = asset_response.results[0].resource_name
+
+    # 2. Добавляем к App Ad
+    ad_service = client.get_service("AdService")
+    ad_op = client.get_type("AdOperation")
+    ad = ad_op.update
+    ad.resource_name = f"customers/{customer_id}/ads/{ad_id}"
+
+    bundle_asset = client.get_type("AdMediaBundleAsset")
+    bundle_asset.asset = asset_resource_name
+    ad.app_ad.html5_media_bundles.append(bundle_asset)
+
+    field_mask = field_mask_pb2.FieldMask(paths=["app_ad.html5_media_bundles"])
+    ad_op.update_mask.CopyFrom(field_mask)
+
+    ad_response = ad_service.mutate_ads(customer_id=customer_id, operations=[ad_op])
+    return {
+        "asset_resource_name": asset_resource_name,
+        "ad_updated": ad_response.results[0].resource_name,
+        "file": file_path,
+        "name": asset.name,
+    }
+
+
+def list_html5_banners(
+    client: GoogleAdsClient,
+    customer_id: str,
+    campaign_id: str,
+) -> list[dict]:
+    """Список HTML5 баннеров (media bundle assets) в App Ads кампании."""
+    ga_service = client.get_service("GoogleAdsService")
+    query = f"""
+        SELECT
+            ad_group_ad.ad.id,
+            ad_group_ad.ad.app_ad.html5_media_bundles,
+            ad_group.id,
+            ad_group.name
+        FROM ad_group_ad
+        WHERE campaign.id = {campaign_id}
+          AND ad_group_ad.ad.type = 'APP_AD'
+    """
+    rows = list(ga_service.search(customer_id=customer_id, query=query))
+    result = []
+    for row in rows:
+        bundles = row.ad_group_ad.ad.app_ad.html5_media_bundles
+        if bundles:
+            result.append({
+                "ad_id": str(row.ad_group_ad.ad.id),
+                "ad_group_id": str(row.ad_group.id),
+                "ad_group_name": row.ad_group.name,
+                "html5_bundles": [b.asset for b in bundles],
+                "bundle_count": len(bundles),
+            })
+    return result
+
+
 def remove_text_asset(
     client: GoogleAdsClient,
     customer_id: str,

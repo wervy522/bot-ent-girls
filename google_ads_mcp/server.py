@@ -5,7 +5,7 @@ import os
 import subprocess
 from mcp.server.fastmcp import FastMCP
 from .client import get_client, get_customer_id
-from .tools import campaigns, assets, search
+from .tools import campaigns, assets, search, geo
 
 _VPS_HOST = "root@68.183.223.89"
 _VPS_KEY = os.path.expanduser("~/.ssh/google_ads_rotator")
@@ -512,6 +512,85 @@ def get_keyword_metrics(
     Возвращает impressions, clicks, conversions, cost, CTR, Quality Score — по каждому ключу.
     """
     return search.get_keyword_metrics(get_client(), _cid(customer_id), ad_group_id, date_range)
+
+
+# ── HTML5 Banners ───────────────────────────────────────────────────────────
+
+@mcp.tool()
+def upload_html5_banner(
+    file_path: str,
+    ad_id: str,
+    name: str = None,
+    customer_id: str = None,
+) -> dict:
+    """
+    Загрузить HTML5 ZIP-баннер и добавить к существующему App Ad.
+    file_path — полный путь к ZIP-файлу на локальной машине.
+    ad_id — ID объявления (получи через list_ad_group_ads).
+    name — опционально, название ассета.
+    """
+    return assets.upload_html5_banner(get_client(), _cid(customer_id), file_path, ad_id, name)
+
+
+@mcp.tool()
+def list_html5_banners(campaign_id: str, customer_id: str = None) -> list[dict]:
+    """
+    Список HTML5 баннеров (media bundle assets) в App Ads кампании.
+    Показывает какие ZIP-баннеры привязаны к каким объявлениям.
+    """
+    return assets.list_html5_banners(get_client(), _cid(customer_id), campaign_id)
+
+
+# ── Geo Targeting ───────────────────────────────────────────────────────────
+
+@mcp.tool()
+def search_locations(query: str) -> list[dict]:
+    """
+    Найти страны/регионы/города для гео-таргетинга по названию.
+    Возвращает id, name, country_code, target_type.
+    Используй id из результата в add_campaign_locations.
+    Примеры: "United States", "Germany", "California", "London"
+    """
+    return geo.search_geo_targets(get_client(), query)
+
+
+@mcp.tool()
+def list_campaign_locations(campaign_id: str, customer_id: str = None) -> list[dict]:
+    """
+    Список гео-таргетов кампании (страны, регионы).
+    Показывает criterion_id, название, country_code, негативный ли таргет.
+    criterion_id нужен для удаления через remove_campaign_location.
+    """
+    return geo.list_campaign_locations(get_client(), _cid(customer_id), campaign_id)
+
+
+@mcp.tool()
+def add_campaign_locations(
+    campaign_id: str,
+    geo_target_ids: list[str],
+    negative: bool = False,
+    customer_id: str = None,
+) -> list[dict]:
+    """
+    Добавить страны/регионы к кампании.
+    geo_target_ids — список ID из search_locations (поле "id").
+    negative=true — добавить как исключение (exclude).
+    Пример: geo_target_ids=["2840"] для США, ["2276"] для Германии.
+    """
+    return geo.add_campaign_locations(get_client(), _cid(customer_id), campaign_id, geo_target_ids, negative)
+
+
+@mcp.tool()
+def remove_campaign_location(
+    campaign_id: str,
+    criterion_id: str,
+    customer_id: str = None,
+) -> dict:
+    """
+    Удалить страну/регион из гео-таргетинга кампании.
+    criterion_id — получи через list_campaign_locations.
+    """
+    return geo.remove_campaign_location(get_client(), _cid(customer_id), campaign_id, criterion_id)
 
 
 def main():

@@ -165,6 +165,51 @@ def update_app_ad_texts(
     }
 
 
+def create_app_ad(
+    client: GoogleAdsClient,
+    customer_id: str,
+    ad_group_id: str,
+    headlines: list[str],
+    descriptions: list[str],
+) -> dict:
+    """
+    Создать App Ad в группе объявлений UAC-кампании.
+    headlines: 2+ заголовка (до 30 символов каждый).
+    descriptions: 1+ описание (до 90 символов каждое).
+    После создания используй upload_html5_banner чтобы добавить баннеры.
+    """
+    ad_group_ad_service = client.get_service("AdGroupAdService")
+    ad_group_service = client.get_service("AdGroupService")
+
+    op = client.get_type("AdGroupAdOperation")
+    aga = op.create
+    aga.ad_group = ad_group_service.ad_group_path(customer_id, ad_group_id)
+    aga.status = client.enums.AdGroupAdStatusEnum.ENABLED
+
+    ad = aga.ad
+    for text in headlines:
+        asset = client.get_type("AdTextAsset")
+        asset.text = text[:30]
+        ad.app_ad.headlines.append(asset)
+    for text in descriptions:
+        asset = client.get_type("AdTextAsset")
+        asset.text = text[:90]
+        ad.app_ad.descriptions.append(asset)
+
+    response = ad_group_ad_service.mutate_ad_group_ads(
+        customer_id=customer_id, operations=[op]
+    )
+    resource_name = response.results[0].resource_name
+    ad_id = resource_name.split("~")[-1]
+    return {
+        "ad_id": ad_id,
+        "resource_name": resource_name,
+        "ad_group_id": ad_group_id,
+        "headlines": headlines,
+        "descriptions": descriptions,
+    }
+
+
 def list_ad_group_ads(
     client: GoogleAdsClient,
     customer_id: str,

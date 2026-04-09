@@ -69,6 +69,7 @@ def create_ad_group(
     campaign_id: str,
     name: str,
     cpc_bid_usd: float = None,
+    ad_group_type: str = "SEARCH_STANDARD",
 ) -> dict:
     ad_group_service = client.get_service("AdGroupService")
     campaign_service = client.get_service("CampaignService")
@@ -78,7 +79,8 @@ def create_ad_group(
     ag.name = name
     ag.campaign = campaign_service.campaign_path(customer_id, campaign_id)
     ag.status = client.enums.AdGroupStatusEnum.ENABLED
-    ag.type_ = client.enums.AdGroupTypeEnum.SEARCH_STANDARD
+    if ad_group_type:
+        ag.type_ = client.enums.AdGroupTypeEnum[ad_group_type]
     if cpc_bid_usd is not None:
         ag.cpc_bid_micros = int(cpc_bid_usd * 1_000_000)
 

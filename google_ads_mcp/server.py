@@ -139,6 +139,24 @@ def update_app_ad_texts(
 
 
 @mcp.tool()
+def create_app_ad(
+    ad_group_id: str,
+    headlines: list[str],
+    descriptions: list[str],
+    customer_id: str = None,
+) -> dict:
+    """
+    Создать новое App Ad в группе объявлений UAC-кампании.
+    headlines: минимум 2 заголовка (до 30 символов каждый).
+    descriptions: минимум 1 описание (до 90 символов каждое).
+    ad_group_id — получи через list_ad_groups или create_ad_group.
+    После создания используй upload_html5_banner чтобы добавить HTML5-баннеры.
+    """
+    return assets.create_app_ad(get_client(), _cid(customer_id), ad_group_id, headlines, descriptions)
+
+
+
+@mcp.tool()
 def start_rotation(campaign_id: str, customer_id: str = None) -> dict:
     """
     Запустить автоматическую ротацию заголовков и описаний на VPS (работает 24/7).
@@ -330,13 +348,18 @@ def create_ad_group(
     campaign_id: str,
     name: str,
     cpc_bid_usd: float = None,
+    ad_group_type: str = "SEARCH_STANDARD",
     customer_id: str = None,
 ) -> dict:
     """
-    Создать группу объявлений в поисковой кампании.
+    Создать группу объявлений в кампании.
     cpc_bid_usd — максимальная ставка за клик в USD (опционально).
+    ad_group_type — тип группы:
+      SEARCH_STANDARD (по умолчанию, для поисковых кампаний),
+      пустая строка "" — для UAC/App кампаний (тип задаётся автоматически).
+    Для App-кампаний: передай ad_group_type="" затем создай App Ad через create_app_ad.
     """
-    return search.create_ad_group(get_client(), _cid(customer_id), campaign_id, name, cpc_bid_usd)
+    return search.create_ad_group(get_client(), _cid(customer_id), campaign_id, name, cpc_bid_usd, ad_group_type or None)
 
 
 # ── RSA Ads ────────────────────────────────────────────────────────────────

@@ -244,6 +244,22 @@ def list_ad_group_ads(
     return result
 
 
+def _get_existing_html5_bundles(
+    client: GoogleAdsClient, customer_id: str, ad_id: str
+) -> list[str]:
+    """Получить resource_name существующих html5_media_bundles для ad_id."""
+    ga_service = client.get_service("GoogleAdsService")
+    query = f"""
+        SELECT ad_group_ad.ad.app_ad.html5_media_bundles
+        FROM ad_group_ad
+        WHERE ad_group_ad.ad.id = {ad_id}
+    """
+    rows = list(ga_service.search(customer_id=customer_id, query=query))
+    if not rows:
+        return []
+    return [b.asset for b in rows[0].ad_group_ad.ad.app_ad.html5_media_bundles]
+
+
 def upload_html5_banner(
     client: GoogleAdsClient,
     customer_id: str,
@@ -255,7 +271,10 @@ def upload_html5_banner(
     Загрузить HTML5 ZIP-баннер и добавить к существующему App Ad.
     file_path — путь к ZIP-файлу на локальной машине.
     ad_id — получи через list_ad_group_ads.
+    Существующие баннеры сохраняются, новый добавляется к ним.
     """
+    import os
+
     with open(file_path, "rb") as f:
         data = f.read()
 
@@ -263,37 +282,38 @@ def upload_html5_banner(
     asset_service = client.get_service("AssetService")
     asset_op = client.get_type("AssetOperation")
     asset = asset_op.create
-    if name:
-        asset.name = name
-    else:
-        import os
-        asset.name = os.path.basename(file_path)
+    asset.name = name or os.path.basename(file_path)
     asset.media_bundle_asset.data = data
 
     asset_response = asset_service.mutate_assets(
         customer_id=customer_id, operations=[asset_op]
     )
-    asset_resource_name = asset_response.results[0].resource_name
+    new_asset_resource = asset_response.results[0].resource_name
 
-    # 2. Добавляем к App Ad
+    # 2. Читаем существующие бандлы и добавляем новый к ним
+    existing = _get_existing_html5_bundles(client, customer_id, ad_id)
+    all_bundles = existing + [new_asset_resource]
+
     ad_service = client.get_service("AdService")
     ad_op = client.get_type("AdOperation")
     ad = ad_op.update
     ad.resource_name = f"customers/{customer_id}/ads/{ad_id}"
 
-    bundle_asset = client.get_type("AdMediaBundleAsset")
-    bundle_asset.asset = asset_resource_name
-    ad.app_ad.html5_media_bundles.append(bundle_asset)
+    for bundle_resource in all_bundles:
+        bundle_asset = client.get_type("AdMediaBundleAsset")
+        bundle_asset.asset = bundle_resource
+        ad.app_ad.html5_media_bundles.append(bundle_asset)
 
     field_mask = field_mask_pb2.FieldMask(paths=["app_ad.html5_media_bundles"])
     ad_op.update_mask.CopyFrom(field_mask)
 
     ad_response = ad_service.mutate_ads(customer_id=customer_id, operations=[ad_op])
     return {
-        "asset_resource_name": asset_resource_name,
+        "asset_resource_name": new_asset_resource,
         "ad_updated": ad_response.results[0].resource_name,
-        "file": file_path,
+        "file": os.path.basename(file_path),
         "name": asset.name,
+        "total_banners": len(all_bundles),
     }
 
 

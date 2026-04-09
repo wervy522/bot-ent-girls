@@ -37,25 +37,19 @@ def list_campaign_locations(
             campaign_criterion.criterion_id,
             campaign_criterion.location.geo_target_constant,
             campaign_criterion.negative,
-            campaign_criterion.status,
-            geo_target_constant.name,
-            geo_target_constant.country_code,
-            geo_target_constant.target_type
+            campaign_criterion.status
         FROM campaign_criterion
         WHERE campaign.id = {campaign_id}
           AND campaign_criterion.type = 'LOCATION'
-        ORDER BY geo_target_constant.name
+        ORDER BY campaign_criterion.criterion_id
     """
     response = ga_service.search(customer_id=customer_id, query=query)
     return [
         {
             "criterion_id": str(row.campaign_criterion.criterion_id),
-            "name": row.geo_target_constant.name,
-            "country_code": row.geo_target_constant.country_code,
-            "target_type": row.geo_target_constant.target_type.name,
+            "geo_target_resource": row.campaign_criterion.location.geo_target_constant,
             "negative": row.campaign_criterion.negative,
             "status": row.campaign_criterion.status.name,
-            "geo_target_resource": row.campaign_criterion.location.geo_target_constant,
         }
         for row in response
     ]

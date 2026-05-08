@@ -114,6 +114,17 @@ def create_search_campaign(
 
 
 @mcp.tool()
+def list_conversion_actions(customer_id: str = None, status_filter: str = "ENABLED") -> list[dict]:
+    """
+    Список конверсий аккаунта с их ID.
+    При создании App кампании с OPTIMIZE_IN_APP_CONVERSIONS_TARGET_CONVERSION_COST
+    конверсии подтягиваются автоматически — этот инструмент для ручной проверки.
+    status_filter: ENABLED | ALL
+    """
+    return campaigns.list_conversion_actions(get_client(), _cid(customer_id), status_filter)
+
+
+@mcp.tool()
 def create_app_campaign(
     name: str,
     app_id: str,

@@ -135,6 +135,53 @@ def get_campaign_metrics(
     return {"campaign_id": campaign_id, "date_range": date_range, "impressions": 0}
 
 
+# ── Конверсии ─────────────────────────────────────────────────────────────
+
+def list_conversion_actions(
+    client: GoogleAdsClient,
+    customer_id: str,
+    status_filter: str = "ENABLED",
+) -> list[dict]:
+    """Список конверсий аккаунта. status_filter: ENABLED | ALL."""
+    ga_service = client.get_service("GoogleAdsService")
+    where = f"WHERE conversion_action.status = '{status_filter}'" if status_filter != "ALL" else ""
+    query = f"""
+        SELECT
+            conversion_action.id,
+            conversion_action.name,
+            conversion_action.status,
+            conversion_action.type,
+            conversion_action.category,
+            conversion_action.include_in_conversions_metric
+        FROM conversion_action
+        {where}
+        ORDER BY conversion_action.name
+    """
+    response = ga_service.search(customer_id=customer_id, query=query)
+    return [
+        {
+            "id": str(row.conversion_action.id),
+            "name": row.conversion_action.name,
+            "status": row.conversion_action.status.name,
+            "type": row.conversion_action.type_.name,
+            "category": row.conversion_action.category.name,
+            "include_in_conversions": row.conversion_action.include_in_conversions_metric,
+        }
+        for row in response
+    ]
+
+
+def _auto_conversion_ids(client: GoogleAdsClient, customer_id: str) -> list[str]:
+    """Вернуть ID всех ENABLED конверсий для selective_optimization."""
+    actions = list_conversion_actions(client, customer_id, status_filter="ENABLED")
+    if not actions:
+        raise ValueError(
+            f"В аккаунте {customer_id} нет активных конверсий. "
+            "Создайте конверсию в Google Ads UI или передайте conversion_action_ids вручную."
+        )
+    return [a["id"] for a in actions]
+
+
 # ── Создание кампаний ──────────────────────────────────────────────────────
 
 def _create_budget(
@@ -269,6 +316,14 @@ def create_app_campaign(
     )
 
     # Selective optimization — обязательно для OPTIMIZE_IN_APP_CONVERSIONS_TARGET_CONVERSION_COST
+    # Если IDs не переданы явно — подтягиваем автоматически из аккаунта
+    _GOALS_REQUIRING_CONVERSIONS = {
+        "OPTIMIZE_IN_APP_CONVERSIONS_TARGET_CONVERSION_COST",
+        "OPTIMIZE_IN_APP_CONVERSIONS_TARGET_INSTALL_COST",
+    }
+    if conversion_action_ids is None and bidding_goal in _GOALS_REQUIRING_CONVERSIONS:
+        conversion_action_ids = _auto_conversion_ids(client, customer_id)
+
     if conversion_action_ids:
         conversion_action_service = client.get_service("ConversionActionService")
         for ca_id in conversion_action_ids:

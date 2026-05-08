@@ -86,6 +86,67 @@ def get_campaign_metrics(campaign_id: str, date_range: str = "LAST_30_DAYS", cus
     return campaigns.get_campaign_metrics(get_client(), _cid(customer_id), campaign_id, date_range)
 
 
+# ── Create Campaigns ───────────────────────────────────────────────────────
+
+@mcp.tool()
+def create_search_campaign(
+    name: str,
+    budget_usd: float,
+    bidding_strategy: str = "MAXIMIZE_CONVERSIONS",
+    target_cpa_usd: float = None,
+    start_date: str = None,
+    end_date: str = None,
+    customer_id: str = None,
+) -> dict:
+    """
+    Создать поисковую кампанию (SEARCH). Создаётся на паузе — включить через update_campaign_status.
+    name — название кампании.
+    budget_usd — дневной бюджет в USD.
+    bidding_strategy: MAXIMIZE_CONVERSIONS | TARGET_CPA | MANUAL_CPC | MAXIMIZE_CONVERSION_VALUE
+    target_cpa_usd — целевая цена за конверсию (для MAXIMIZE_CONVERSIONS и TARGET_CPA).
+    start_date / end_date — дата в формате YYYYMMDD (опционально).
+    customer_id — опционально, дефолт Pure=6581104929.
+    """
+    return campaigns.create_search_campaign(
+        get_client(), _cid(customer_id), name, budget_usd,
+        bidding_strategy, target_cpa_usd, start_date, end_date
+    )
+
+
+@mcp.tool()
+def create_app_campaign(
+    name: str,
+    app_id: str,
+    app_store: str,
+    budget_usd: float,
+    bidding_goal: str = "OPTIMIZE_INSTALLS_TARGET_INSTALL_COST",
+    target_cpa_usd: float = None,
+    start_date: str = None,
+    customer_id: str = None,
+) -> dict:
+    """
+    Создать UAC (App) кампанию. Создаётся на паузе.
+    name — название кампании.
+    app_id — ID приложения (например "6754603083" для iOS или bundle ID для Android).
+    app_store: APPLE_APP_STORE | GOOGLE_APP_STORE
+    budget_usd — дневной бюджет в USD.
+    bidding_goal:
+      OPTIMIZE_INSTALLS_TARGET_INSTALL_COST — целевая цена за установку (нужен target_cpa_usd)
+      OPTIMIZE_IN_APP_CONVERSIONS_TARGET_CONVERSION_COST — конверсии (нужен target_cpa_usd)
+      OPTIMIZE_RETURN_ON_ADVERTISING_SPEND — максимум ROAS
+      OPTIMIZE_INSTALLS_WITHOUT_TARGET_INSTALL_COST — максимум установок без цели
+    target_cpa_usd — целевая цена за установку/конверсию в USD.
+    start_date — дата в формате YYYYMMDD (опционально).
+    customer_id — опционально. Известные аккаунты:
+      Pure=6581104929, Cleaner-AD_1=3023760603, Cleaner-AD_2=9033532211,
+      Cleaner-AD_3=9222917248, Cleaner-AD_4=9438831076, PB_new_new=6658090517.
+    """
+    return campaigns.create_app_campaign(
+        get_client(), _cid(customer_id), name, app_id, app_store,
+        budget_usd, bidding_goal, target_cpa_usd, start_date
+    )
+
+
 # ── Asset Groups (UAC ads) ─────────────────────────────────────────────────
 
 @mcp.tool()

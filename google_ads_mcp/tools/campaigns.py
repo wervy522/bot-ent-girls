@@ -230,6 +230,9 @@ def create_search_campaign(
     c.advertising_channel_type = client.enums.AdvertisingChannelTypeEnum.SEARCH
     c.status = client.enums.CampaignStatusEnum.PAUSED  # создаём на паузе
     c.campaign_budget = budget_resource
+    c.contains_eu_political_advertising = (
+        client.enums.EuPoliticalAdvertisingStatusEnum.DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING
+    )
 
     # Сетевые настройки
     c.network_settings.target_google_search = True
@@ -305,8 +308,10 @@ def create_app_campaign(
     c.status = client.enums.CampaignStatusEnum.PAUSED
     c.campaign_budget = budget_resource
 
-    # Обязательное поле — не политическая реклама
-    c.contains_eu_political_advertising = False
+    # Обязательное поле — не политическая реклама (enum, не bool!)
+    c.contains_eu_political_advertising = (
+        client.enums.EuPoliticalAdvertisingStatusEnum.DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING
+    )
 
     # App настройки
     c.app_campaign_setting.app_id = app_id

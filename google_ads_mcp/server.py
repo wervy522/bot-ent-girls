@@ -122,6 +122,7 @@ def create_app_campaign(
     bidding_goal: str = "OPTIMIZE_INSTALLS_TARGET_INSTALL_COST",
     target_cpa_usd: float = None,
     start_date: str = None,
+    conversion_action_ids: list[str] = None,
     customer_id: str = None,
 ) -> dict:
     """
@@ -132,18 +133,20 @@ def create_app_campaign(
     budget_usd — дневной бюджет в USD.
     bidding_goal:
       OPTIMIZE_INSTALLS_TARGET_INSTALL_COST — целевая цена за установку (нужен target_cpa_usd)
-      OPTIMIZE_IN_APP_CONVERSIONS_TARGET_CONVERSION_COST — конверсии (нужен target_cpa_usd)
+      OPTIMIZE_IN_APP_CONVERSIONS_TARGET_CONVERSION_COST — конверсии (нужен target_cpa_usd + conversion_action_ids)
       OPTIMIZE_RETURN_ON_ADVERTISING_SPEND — максимум ROAS
       OPTIMIZE_INSTALLS_WITHOUT_TARGET_INSTALL_COST — максимум установок без цели
     target_cpa_usd — целевая цена за установку/конверсию в USD.
     start_date — дата в формате YYYYMMDD (опционально).
+    conversion_action_ids — список ID конверсий, обязателен для OPTIMIZE_IN_APP_CONVERSIONS_TARGET_CONVERSION_COST.
+      Например ["123456789"] для Trial Start. Узнать ID можно через Google Ads UI → Конверсии.
     customer_id — опционально. Известные аккаунты:
       Pure=6581104929, Cleaner-AD_1=3023760603, Cleaner-AD_2=9033532211,
       Cleaner-AD_3=9222917248, Cleaner-AD_4=9438831076, PB_new_new=6658090517.
     """
     return campaigns.create_app_campaign(
         get_client(), _cid(customer_id), name, app_id, app_store,
-        budget_usd, bidding_goal, target_cpa_usd, start_date
+        budget_usd, bidding_goal, target_cpa_usd, start_date, conversion_action_ids
     )
 
 

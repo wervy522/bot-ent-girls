@@ -232,6 +232,7 @@ def create_app_campaign(
     bidding_goal: str = "OPTIMIZE_INSTALLS_TARGET_INSTALL_COST",
     target_cpa_usd: float = None,
     start_date: str = None,
+    conversion_action_ids: list[str] = None,
 ) -> dict:
     """
     Создать UAC (App) кампанию.
@@ -242,6 +243,7 @@ def create_app_campaign(
       OPTIMIZE_IN_APP_CONVERSIONS_TARGET_CONVERSION_COST — целевая цена за конверсию
       OPTIMIZE_RETURN_ON_ADVERTISING_SPEND — ROAS
     target_cpa_usd — целевая цена (если применимо).
+    conversion_action_ids — список ID конверсий (обязателен для OPTIMIZE_IN_APP_CONVERSIONS_TARGET_CONVERSION_COST).
     """
     budget_resource = _create_budget(client, customer_id, budget_usd, f"{name} Budget")
 
@@ -256,12 +258,24 @@ def create_app_campaign(
     c.status = client.enums.CampaignStatusEnum.PAUSED
     c.campaign_budget = budget_resource
 
+    # Обязательное поле — не политическая реклама
+    c.contains_eu_political_advertising = False
+
     # App настройки
     c.app_campaign_setting.app_id = app_id
     c.app_campaign_setting.app_store = client.enums.AppCampaignAppStoreEnum[app_store]
     c.app_campaign_setting.bidding_strategy_goal_type = (
         client.enums.AppCampaignBiddingStrategyGoalTypeEnum[bidding_goal]
     )
+
+    # Selective optimization — обязательно для OPTIMIZE_IN_APP_CONVERSIONS_TARGET_CONVERSION_COST
+    if conversion_action_ids:
+        conversion_action_service = client.get_service("ConversionActionService")
+        for ca_id in conversion_action_ids:
+            ca_resource = conversion_action_service.conversion_action_path(
+                customer_id, ca_id
+            )
+            c.selective_optimization.conversion_actions.append(ca_resource)
 
     # Стратегия ставок
     if target_cpa_usd is not None:
@@ -287,5 +301,6 @@ def create_app_campaign(
         "budget_usd": budget_usd,
         "bidding_goal": bidding_goal,
         "target_cpa_usd": target_cpa_usd,
+        "conversion_action_ids": conversion_action_ids or [],
         "status": "PAUSED",
     }

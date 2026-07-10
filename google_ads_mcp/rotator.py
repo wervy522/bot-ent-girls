@@ -257,18 +257,35 @@ def _pick_texts(campaign_id: str, n_headlines: int = 5, n_descriptions: int = 5)
 def update_ads(campaign_id: str, customer_id: str = None):
     from google_ads_mcp.client import get_client, get_customer_id
     from google_ads_mcp.tools.assets import list_ad_group_ads, update_app_ad_texts
+    from google_ads_mcp.tools.campaigns import get_campaign
 
     client = get_client()
     cid = customer_id or get_customer_id()
+
+    # Пропускаем если кампания на паузе или удалена
+    try:
+        campaign = get_campaign(client, cid, campaign_id)
+        if campaign["status"] != "ENABLED":
+            log.info(f"Кампания {campaign_id} в статусе {campaign['status']} — пропускаю")
+            return
+    except Exception as e:
+        log.warning(f"Не удалось проверить статус кампании {campaign_id}: {e}")
+        return
 
     ads = list_ad_group_ads(client, cid, campaign_id)
     if not ads:
         log.warning(f"Кампания {campaign_id}: объявлений не найдено")
         return
 
+    # Только активные объявления
+    active_ads = [ad for ad in ads if ad["status"] == "ENABLED"]
+    if not active_ads:
+        log.info(f"Кампания {campaign_id}: нет активных объявлений — пропускаю")
+        return
+
     headlines, descriptions = _pick_texts(campaign_id, n_headlines=2, n_descriptions=1)
 
-    for ad in ads:
+    for ad in active_ads:
         try:
             update_app_ad_texts(client, cid, ad["ad_id"], headlines, descriptions)
             log.info(

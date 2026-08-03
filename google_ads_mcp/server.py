@@ -4,7 +4,14 @@ Google Ads MCP Server — управление UAC iOS кампаниями.
 import os
 import subprocess
 from mcp.server.fastmcp import FastMCP
-from .client import get_client, get_customer_id
+from .client import (
+    get_client,
+    get_customer_id,
+    client_for,
+    list_mccs,
+    list_child_accounts,
+    resolve_mcc,
+)
 from .tools import campaigns, assets, search, geo
 
 _VPS_HOST = "root@68.183.223.89"
@@ -48,6 +55,30 @@ def _cid(customer_id: str = None) -> str:
     return customer_id.replace("-", "") if customer_id else get_customer_id()
 
 
+def _client(customer_id: str = None):
+    """Клиент с MCC, под которым живёт аккаунт."""
+    return client_for(_cid(customer_id))
+
+
+@mcp.tool()
+def list_accounts() -> dict:
+    """
+    Все доступные аккаунты по всем подключённым MCC.
+    Показывает какой аккаунт под каким MCC — customer_id можно передавать
+    в любой инструмент, MCC подставится автоматически.
+    """
+    result = {}
+    for mcc in list_mccs():
+        try:
+            result[mcc] = [
+                {"id": a["id"], "name": a["name"], "status": a["status"]}
+                for a in list_child_accounts(mcc)
+            ]
+        except Exception as e:
+            result[mcc] = {"error": str(e)}
+    return result
+
+
 @mcp.tool()
 def list_campaigns(status_filter: str = "ENABLED", customer_id: str = None) -> list[dict]:
     """
@@ -59,13 +90,13 @@ def list_campaigns(status_filter: str = "ENABLED", customer_id: str = None) -> l
       PDF-Reader=5670102394, iDefNet VPN=9285227682, Guru cleaner=8027081917,
       Chattera IOS=7287138580, Nuero=4525725117, Pure_v2=7510430639.
     """
-    return campaigns.list_campaigns(get_client(), _cid(customer_id), status_filter)
+    return campaigns.list_campaigns(_client(customer_id), _cid(customer_id), status_filter)
 
 
 @mcp.tool()
 def get_campaign(campaign_id: str, customer_id: str = None) -> dict:
     """Детальная информация о кампании по ID."""
-    return campaigns.get_campaign(get_client(), _cid(customer_id), campaign_id)
+    return campaigns.get_campaign(_client(customer_id), _cid(customer_id), campaign_id)
 
 
 @mcp.tool()
@@ -74,7 +105,7 @@ def update_campaign_status(campaign_id: str, status: str, customer_id: str = Non
     Изменить статус кампании.
     status: ENABLED | PAUSED
     """
-    return campaigns.update_campaign_status(get_client(), _cid(customer_id), campaign_id, status)
+    return campaigns.update_campaign_status(_client(customer_id), _cid(customer_id), campaign_id, status)
 
 
 @mcp.tool()
@@ -83,7 +114,7 @@ def get_campaign_metrics(campaign_id: str, date_range: str = "LAST_30_DAYS", cus
     Метрики кампании: impressions, clicks, conversions, cost.
     date_range: TODAY | LAST_7_DAYS | LAST_30_DAYS | THIS_MONTH | LAST_MONTH
     """
-    return campaigns.get_campaign_metrics(get_client(), _cid(customer_id), campaign_id, date_range)
+    return campaigns.get_campaign_metrics(_client(customer_id), _cid(customer_id), campaign_id, date_range)
 
 
 # ── Create Campaigns ───────────────────────────────────────────────────────
@@ -108,7 +139,7 @@ def create_search_campaign(
     customer_id — опционально, дефолт Pure=6581104929.
     """
     return campaigns.create_search_campaign(
-        get_client(), _cid(customer_id), name, budget_usd,
+        _client(customer_id), _cid(customer_id), name, budget_usd,
         bidding_strategy, target_cpa_usd, start_date, end_date
     )
 
@@ -121,7 +152,7 @@ def list_conversion_actions(customer_id: str = None, status_filter: str = "ENABL
     конверсии подтягиваются автоматически — этот инструмент для ручной проверки.
     status_filter: ENABLED | ALL
     """
-    return campaigns.list_conversion_actions(get_client(), _cid(customer_id), status_filter)
+    return campaigns.list_conversion_actions(_client(customer_id), _cid(customer_id), status_filter)
 
 
 @mcp.tool()
@@ -156,7 +187,7 @@ def create_app_campaign(
       Cleaner-AD_3=9222917248, Cleaner-AD_4=9438831076, PB_new_new=6658090517.
     """
     return campaigns.create_app_campaign(
-        get_client(), _cid(customer_id), name, app_id, app_store,
+        _client(customer_id), _cid(customer_id), name, app_id, app_store,
         budget_usd, bidding_goal, target_cpa_usd, start_date, conversion_action_ids
     )
 
@@ -166,13 +197,13 @@ def create_app_campaign(
 @mcp.tool()
 def list_asset_groups(campaign_id: str, customer_id: str = None) -> list[dict]:
     """Список asset groups для UAC кампании."""
-    return assets.list_asset_groups(get_client(), _cid(customer_id), campaign_id)
+    return assets.list_asset_groups(_client(customer_id), _cid(customer_id), campaign_id)
 
 
 @mcp.tool()
 def get_asset_group(asset_group_id: str, customer_id: str = None) -> dict:
     """Все assets (заголовки, тексты, картинки, видео) одной asset group."""
-    return assets.get_asset_group(get_client(), _cid(customer_id), asset_group_id)
+    return assets.get_asset_group(_client(customer_id), _cid(customer_id), asset_group_id)
 
 
 @mcp.tool()
@@ -181,7 +212,7 @@ def add_text_asset(asset_group_id: str, text: str, field_type: str, customer_id:
     Добавить текстовый asset в asset group.
     field_type: HEADLINE | DESCRIPTION | LONG_HEADLINE
     """
-    return assets.add_text_asset(get_client(), _cid(customer_id), asset_group_id, text, field_type)
+    return assets.add_text_asset(_client(customer_id), _cid(customer_id), asset_group_id, text, field_type)
 
 
 @mcp.tool()
@@ -190,7 +221,7 @@ def remove_text_asset(asset_group_id: str, asset_group_asset_resource_name: str,
     Удалить текстовый asset из asset group.
     Передай resource_name из get_asset_group.
     """
-    return assets.remove_text_asset(get_client(), _cid(customer_id), asset_group_asset_resource_name)
+    return assets.remove_text_asset(_client(customer_id), _cid(customer_id), asset_group_asset_resource_name)
 
 
 @mcp.tool()
@@ -199,7 +230,7 @@ def list_ad_group_ads(campaign_id: str, customer_id: str = None) -> list[dict]:
     Список всех App Ads кампании с их ad_id, ad_group, текущими заголовками и описаниями.
     Используй чтобы узнать ad_id перед вызовом update_app_ad_texts.
     """
-    return assets.list_ad_group_ads(get_client(), _cid(customer_id), campaign_id)
+    return assets.list_ad_group_ads(_client(customer_id), _cid(customer_id), campaign_id)
 
 
 @mcp.tool()
@@ -214,7 +245,7 @@ def update_app_ad_texts(
     Нужно передать ровно 2 заголовка (до 30 символов) и 1 описание (до 90 символов).
     ad_id — получи через list_ad_group_ads.
     """
-    return assets.update_app_ad_texts(get_client(), _cid(customer_id), ad_id, headlines, descriptions)
+    return assets.update_app_ad_texts(_client(customer_id), _cid(customer_id), ad_id, headlines, descriptions)
 
 
 @mcp.tool()
@@ -231,7 +262,7 @@ def create_app_ad(
     ad_group_id — получи через list_ad_groups или create_ad_group.
     После создания используй upload_html5_banner чтобы добавить HTML5-баннеры.
     """
-    return assets.create_app_ad(get_client(), _cid(customer_id), ad_group_id, headlines, descriptions)
+    return assets.create_app_ad(_client(customer_id), _cid(customer_id), ad_group_id, headlines, descriptions)
 
 
 
@@ -411,7 +442,7 @@ def list_search_campaigns(status_filter: str = "ENABLED", customer_id: str = Non
     Список поисковых кампаний (SEARCH).
     status_filter: ENABLED | PAUSED | ALL
     """
-    return search.list_search_campaigns(get_client(), _cid(customer_id), status_filter)
+    return search.list_search_campaigns(_client(customer_id), _cid(customer_id), status_filter)
 
 
 # ── Ad Groups ──────────────────────────────────────────────────────────────
@@ -419,7 +450,7 @@ def list_search_campaigns(status_filter: str = "ENABLED", customer_id: str = Non
 @mcp.tool()
 def list_ad_groups(campaign_id: str, customer_id: str = None) -> list[dict]:
     """Список групп объявлений для кампании."""
-    return search.list_ad_groups(get_client(), _cid(customer_id), campaign_id)
+    return search.list_ad_groups(_client(customer_id), _cid(customer_id), campaign_id)
 
 
 @mcp.tool()
@@ -438,7 +469,7 @@ def create_ad_group(
       пустая строка "" — для UAC/App кампаний (тип задаётся автоматически).
     Для App-кампаний: передай ad_group_type="" затем создай App Ad через create_app_ad.
     """
-    return search.create_ad_group(get_client(), _cid(customer_id), campaign_id, name, cpc_bid_usd, ad_group_type or None)
+    return search.create_ad_group(_client(customer_id), _cid(customer_id), campaign_id, name, cpc_bid_usd, ad_group_type or None)
 
 
 # ── RSA Ads ────────────────────────────────────────────────────────────────
@@ -449,7 +480,7 @@ def list_rsa_ads(campaign_id: str, customer_id: str = None) -> list[dict]:
     Список RSA-объявлений (Responsive Search Ads) кампании.
     Показывает заголовки, описания, URL, группу объявлений.
     """
-    return search.list_rsa_ads(get_client(), _cid(customer_id), campaign_id)
+    return search.list_rsa_ads(_client(customer_id), _cid(customer_id), campaign_id)
 
 
 @mcp.tool()
@@ -466,7 +497,7 @@ def create_rsa_ad(
     descriptions: 2–4 описания (до 90 символов каждое).
     final_url: целевая URL страница.
     """
-    return search.create_rsa_ad(get_client(), _cid(customer_id), ad_group_id, headlines, descriptions, final_url)
+    return search.create_rsa_ad(_client(customer_id), _cid(customer_id), ad_group_id, headlines, descriptions, final_url)
 
 
 @mcp.tool()
@@ -482,7 +513,7 @@ def update_rsa_ad(
     Обновить заголовки и описания RSA-объявления (полная замена).
     ad_id и ad_group_id — получи через list_rsa_ads.
     """
-    return search.update_rsa_ad(get_client(), _cid(customer_id), ad_id, ad_group_id, headlines, descriptions, final_url)
+    return search.update_rsa_ad(_client(customer_id), _cid(customer_id), ad_id, ad_group_id, headlines, descriptions, final_url)
 
 
 # ── Keywords ───────────────────────────────────────────────────────────────
@@ -493,7 +524,7 @@ def list_keywords(ad_group_id: str, customer_id: str = None) -> list[dict]:
     Список ключевых слов в группе объявлений.
     Показывает текст, тип соответствия, ставку, Quality Score, статистику.
     """
-    return search.list_keywords(get_client(), _cid(customer_id), ad_group_id)
+    return search.list_keywords(_client(customer_id), _cid(customer_id), ad_group_id)
 
 
 @mcp.tool()
@@ -509,7 +540,7 @@ def add_keywords(
     match_type: EXACT | PHRASE | BROAD
     cpc_bid_usd — ставка за клик в USD (опционально, иначе наследуется от группы).
     """
-    return search.add_keywords(get_client(), _cid(customer_id), ad_group_id, keywords, match_type, cpc_bid_usd)
+    return search.add_keywords(_client(customer_id), _cid(customer_id), ad_group_id, keywords, match_type, cpc_bid_usd)
 
 
 @mcp.tool()
@@ -522,7 +553,7 @@ def remove_keyword(
     Удалить ключевое слово из группы объявлений.
     criterion_id — получи через list_keywords.
     """
-    return search.remove_keyword(get_client(), _cid(customer_id), ad_group_id, criterion_id)
+    return search.remove_keyword(_client(customer_id), _cid(customer_id), ad_group_id, criterion_id)
 
 
 # ── Negative Keywords ──────────────────────────────────────────────────────
@@ -537,7 +568,7 @@ def list_negative_keywords(
     Список минус-слов на уровне кампании или группы объявлений.
     Укажи campaign_id ИЛИ ad_group_id.
     """
-    return search.list_negative_keywords(get_client(), _cid(customer_id), campaign_id, ad_group_id)
+    return search.list_negative_keywords(_client(customer_id), _cid(customer_id), campaign_id, ad_group_id)
 
 
 @mcp.tool()
@@ -554,7 +585,7 @@ def add_negative_keywords(
     Укажи campaign_id ИЛИ ad_group_id.
     """
     return search.add_negative_keywords(
-        get_client(), _cid(customer_id), keywords, match_type, campaign_id, ad_group_id
+        _client(customer_id), _cid(customer_id), keywords, match_type, campaign_id, ad_group_id
     )
 
 
@@ -569,7 +600,7 @@ def remove_negative_keyword(
     Формат: customers/{customer_id}/campaignCriteria/{campaign_id}~{criterion_id}
     или: customers/{customer_id}/adGroupCriteria/{ad_group_id}~{criterion_id}
     """
-    return search.remove_negative_keyword(get_client(), _cid(customer_id), criterion_resource_name)
+    return search.remove_negative_keyword(_client(customer_id), _cid(customer_id), criterion_resource_name)
 
 
 # ── Search Stats ───────────────────────────────────────────────────────────
@@ -585,7 +616,7 @@ def get_ad_group_metrics(
     date_range: TODAY | LAST_7_DAYS | LAST_30_DAYS | THIS_MONTH | LAST_MONTH
     Возвращает impressions, clicks, conversions, cost, CTR, avg CPC — по каждой группе.
     """
-    return search.get_ad_group_metrics(get_client(), _cid(customer_id), campaign_id, date_range)
+    return search.get_ad_group_metrics(_client(customer_id), _cid(customer_id), campaign_id, date_range)
 
 
 @mcp.tool()
@@ -599,7 +630,7 @@ def get_rsa_ad_metrics(
     date_range: TODAY | LAST_7_DAYS | LAST_30_DAYS | THIS_MONTH | LAST_MONTH
     Возвращает impressions, clicks, conversions, cost, CTR — по каждому объявлению с заголовками.
     """
-    return search.get_rsa_ad_metrics(get_client(), _cid(customer_id), campaign_id, date_range)
+    return search.get_rsa_ad_metrics(_client(customer_id), _cid(customer_id), campaign_id, date_range)
 
 
 @mcp.tool()
@@ -613,7 +644,7 @@ def get_keyword_metrics(
     date_range: TODAY | LAST_7_DAYS | LAST_30_DAYS | THIS_MONTH | LAST_MONTH
     Возвращает impressions, clicks, conversions, cost, CTR, Quality Score — по каждому ключу.
     """
-    return search.get_keyword_metrics(get_client(), _cid(customer_id), ad_group_id, date_range)
+    return search.get_keyword_metrics(_client(customer_id), _cid(customer_id), ad_group_id, date_range)
 
 
 # ── HTML5 Banners ───────────────────────────────────────────────────────────
@@ -631,7 +662,7 @@ def upload_html5_banner(
     ad_id — ID объявления (получи через list_ad_group_ads).
     name — опционально, название ассета.
     """
-    return assets.upload_html5_banner(get_client(), _cid(customer_id), file_path, ad_id, name)
+    return assets.upload_html5_banner(_client(customer_id), _cid(customer_id), file_path, ad_id, name)
 
 
 @mcp.tool()
@@ -640,7 +671,7 @@ def list_html5_banners(campaign_id: str, customer_id: str = None) -> list[dict]:
     Список HTML5 баннеров (media bundle assets) в App Ads кампании.
     Показывает какие ZIP-баннеры привязаны к каким объявлениям.
     """
-    return assets.list_html5_banners(get_client(), _cid(customer_id), campaign_id)
+    return assets.list_html5_banners(_client(customer_id), _cid(customer_id), campaign_id)
 
 
 # ── Geo Targeting ───────────────────────────────────────────────────────────
@@ -663,7 +694,7 @@ def list_campaign_locations(campaign_id: str, customer_id: str = None) -> list[d
     Показывает criterion_id, название, country_code, негативный ли таргет.
     criterion_id нужен для удаления через remove_campaign_location.
     """
-    return geo.list_campaign_locations(get_client(), _cid(customer_id), campaign_id)
+    return geo.list_campaign_locations(_client(customer_id), _cid(customer_id), campaign_id)
 
 
 @mcp.tool()
@@ -679,7 +710,7 @@ def add_campaign_locations(
     negative=true — добавить как исключение (exclude).
     Пример: geo_target_ids=["2840"] для США, ["2276"] для Германии.
     """
-    return geo.add_campaign_locations(get_client(), _cid(customer_id), campaign_id, geo_target_ids, negative)
+    return geo.add_campaign_locations(_client(customer_id), _cid(customer_id), campaign_id, geo_target_ids, negative)
 
 
 @mcp.tool()
@@ -692,7 +723,7 @@ def remove_campaign_location(
     Удалить страну/регион из гео-таргетинга кампании.
     criterion_id — получи через list_campaign_locations.
     """
-    return geo.remove_campaign_location(get_client(), _cid(customer_id), campaign_id, criterion_id)
+    return geo.remove_campaign_location(_client(customer_id), _cid(customer_id), campaign_id, criterion_id)
 
 
 def main():

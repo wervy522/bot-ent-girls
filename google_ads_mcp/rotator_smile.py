@@ -259,12 +259,12 @@ def _pick_texts(campaign_id: str) -> tuple[list, list]:
 # ── Основная логика ────────────────────────────────────────────────────────
 
 def update_ads(campaign_id: str, customer_id: str = None):
-    from google_ads_mcp.client import get_client, get_customer_id
+    from google_ads_mcp.client import client_for, get_customer_id
     from google_ads_mcp.tools.assets import list_ad_group_ads, update_app_ad_texts
     from google_ads_mcp.tools.campaigns import get_campaign
 
-    client = get_client()
     cid = customer_id or get_customer_id()
+    client = client_for(cid)
 
     # Пропускаем если кампания на паузе или удалена
     try:

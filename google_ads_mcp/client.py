@@ -14,10 +14,13 @@ OAuth-поля наследуются от дефолтного MCC, если н
 import os
 import re
 from functools import lru_cache
+from pathlib import Path
 from dotenv import load_dotenv
 from google.ads.googleads.client import GoogleAdsClient
 
-load_dotenv()
+# Явный путь: MCP-сервер и systemd стартуют из произвольного cwd,
+# а load_dotenv() без пути ищет относительно него и .env не находит.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 DEFAULT_MCC = "default"
 

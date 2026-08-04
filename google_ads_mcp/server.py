@@ -12,7 +12,7 @@ from .client import (
     list_child_accounts,
     resolve_mcc,
 )
-from .tools import campaigns, assets, search, geo
+from .tools import campaigns, assets, search, geo, banners
 
 _VPS_HOST = "root@68.183.223.89"
 _VPS_KEY = os.path.expanduser("~/.ssh/google_ads_rotator")
@@ -724,6 +724,100 @@ def remove_campaign_location(
     criterion_id — получи через list_campaign_locations.
     """
     return geo.remove_campaign_location(_client(customer_id), _cid(customer_id), campaign_id, criterion_id)
+
+
+# ── Конструктор HTML5-баннеров ──────────────────────────────────────────────
+
+@mcp.tool()
+def banner_spec() -> str:
+    """
+    Правила вёрстки HTML5-баннеров для App-кампаний.
+    ВЫЗЫВАТЬ ПЕРВЫМ перед тем, как писать вёрстку баннера.
+    """
+    return banners.read_spec()
+
+
+@mcp.tool()
+def banner_build(
+    app: str,
+    slug: str,
+    body_html: str,
+    css: str = "",
+    js: str = "",
+    orientation: str = "portrait",
+    images: dict = None,
+    concept: str = "",
+    dh_min: int = 400,
+    dh_max: int = 720,
+    strict: bool = True,
+) -> dict:
+    """
+    Собрать баннер из вёрстки и прогнать через ворота валидации.
+    Каркас (DOCTYPE, мета, exitapi.js, движок резиновости) добавляется кодом —
+    в body_html/css/js их писать НЕ нужно.
+
+    app — папка проекта, slug — имя баннера
+    body_html — содержимое сцены #stage
+    images — {"art.jpeg": "/путь/к/файлу"}; расширения только .png .jpeg .gif .svg
+    orientation — portrait (320x480) | landscape (480x320)
+    dh_min/dh_max — пределы растяжки сцены по высоте
+    strict — при FAIL путь к ZIP не выдаётся
+
+    Возвращает отчёт: passed, fails с подсказками, warns, zip_path, sha256.
+    """
+    return banners.build_banner(
+        app=app, slug=slug, body_html=body_html, css=css, js=js,
+        orientation=orientation, images=images, concept=concept,
+        dh_min=dh_min, dh_max=dh_max, strict=strict,
+    )
+
+
+@mcp.tool()
+def banner_validate(zip_path: str, render: bool = True, online: bool = True) -> dict:
+    """Проверить любой ZIP-баннер, в том числе собранный не нами."""
+    return banners.validate_banner(zip_path, render=render, online=online)
+
+
+@mcp.tool()
+def banner_preview(zip_path: str, scale: int = 2, viewports: list = None) -> dict:
+    """
+    Отрендерить баннер в PNG в нескольких вьюпортах.
+    По умолчанию 320x480, 360x640, 414x896 — проверить, что резиновость цела.
+    """
+    return banners.preview_banner(zip_path, scale=scale, viewports=viewports)
+
+
+@mcp.tool()
+def banner_generate_art(
+    app: str,
+    prompt: str,
+    out_name: str,
+    orientation: str = "portrait",
+    quality: str = "2K",
+    max_kb: int = 500,
+) -> dict:
+    """
+    Сгенерировать растровый фон для баннера (~$0.14 за картинку).
+    Единственная платная операция в конвейере — для CSS-баннеров не нужна.
+
+    prompt — описание сцены; негативы (без текста, без рамок, full-bleed)
+    добавляются автоматически.
+    out_name — имя файла в бандле, только .jpeg или .png
+    Результат кладётся в библиотеку приложения и переиспользуется.
+    """
+    return banners.generate_art(app=app, prompt=prompt, out_name=out_name,
+                                orientation=orientation, quality=quality, max_kb=max_kb)
+
+
+@mcp.tool()
+def banner_render_text(app: str, out_name: str, html: str,
+                       width: int, height: int, scale: int = 3) -> dict:
+    """
+    Отрендерить HTML в прозрачный PNG (для фирменных шрифтов).
+    Шрифтовые файлы в бандл класть нельзя, а Google Fonts может не догрузиться.
+    """
+    return banners.render_text_image(app=app, out_name=out_name, html=html,
+                                     width=width, height=height, scale=scale)
 
 
 def main():

@@ -292,7 +292,10 @@ def upload_html5_banner(
 
     # 2. Читаем существующие бандлы и добавляем новый к ним
     existing = _get_existing_html5_bundles(client, customer_id, ad_id)
-    all_bundles = existing + [new_asset_resource]
+    # Google дедуплицирует бандлы по контенту, а наш ZIP детерминирован:
+    # повторная заливка тех же байт вернёт ТОТ ЖЕ resource_name, и без
+    # dedupe в списке появится дубль — mutate_ads на этом падает.
+    all_bundles = list(dict.fromkeys(existing + [new_asset_resource]))
 
     ad_service = client.get_service("AdService")
     ad_op = client.get_type("AdOperation")

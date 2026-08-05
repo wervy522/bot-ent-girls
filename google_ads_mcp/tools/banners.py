@@ -231,7 +231,7 @@ def _chrome() -> str | None:
 
 
 def _shoot(files: dict[str, bytes], viewports: list[tuple[int, int]], scale: int = 2,
-           out_dir: Path = None, stem: str = "shot", settle_ms: int = 700):
+           out_dir: Path = None, stem: str = "shot", settle_ms: int = 1800):
     """
     Отрендерить бандл в заданных вьюпортах через Playwright.
 
@@ -263,6 +263,16 @@ def _shoot(files: dict[str, bytes], viewports: list[tuple[int, int]], scale: int
                 try:
                     page.goto(url, wait_until="load", timeout=20000)
                     page.wait_for_timeout(settle_ms)
+                    # каскадные появления идут ~1.2-1.5с: снимать раньше — значит
+                    # поймать полупрозрачные элементы и решить, что их нет вовсе
+                    try:
+                        page.wait_for_function(
+                            "() => document.getAnimations().filter("
+                            "a => a.playState==='running' && "
+                            "(a.effect?.getTiming?.().iterations||1) !== Infinity).length === 0",
+                            timeout=6000)
+                    except Exception:
+                        pass                      # бесконечные анимации — не ждём
 
                     # переполнение меряем в DOM, а не по пикселям: у баннера с
                     # градиентом край кадра всегда пёстрый, и эвристика по цветам
@@ -529,7 +539,8 @@ def validate_banner(zip_path: str, render: bool = True, online: bool = True,
     }
 
 
-def preview_banner(zip_path: str, scale: int = 2, viewports: list = None) -> dict:
+def preview_banner(zip_path: str, scale: int = 2, viewports: list = None,
+                   settle_ms: int = 1800) -> dict:
     """
     Отрендерить баннер в PNG в нескольких вьюпортах — посмотреть глазами,
     что резиновость не сломалась на нестандартном слоте.
@@ -542,7 +553,7 @@ def preview_banner(zip_path: str, scale: int = 2, viewports: list = None) -> dic
            (viewports or ["320x480", "360x640", "414x896"])]
     out_dir = OUT_ROOT / p.parent.parent.name / "preview"
     try:
-        _, shots, errors = _shoot(files, vps, scale=scale, out_dir=out_dir, stem=p.stem)
+        _, shots, errors = _shoot(files, vps, scale=scale, out_dir=out_dir, stem=p.stem, settle_ms=settle_ms)
     except Exception as e:
         return {"error": f"рендер не удался: {str(e)[:120]}"}
     return {"zip": str(p), "shots": shots,
